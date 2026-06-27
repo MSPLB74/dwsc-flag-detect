@@ -55,6 +55,11 @@ export function paramsFromEnv(env = process.env) {
       .split(',')
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n)),
+    // Colour sat/val floors. Default to the original hard-coded values so
+    // production is unchanged unless set; exposed so the /admin/flag-tuning
+    // optimizer's satFloor suggestion is appliable via flag-detect.yml.
+    satFloor: Number(env.FLAG_SAT_FLOOR ?? String(DEFAULT_PARAMS.satFloor)),
+    valFloor: Number(env.FLAG_VAL_FLOOR ?? String(DEFAULT_PARAMS.valFloor)),
     poleDarkV: Number(env.FLAG_POLE_DARK_V ?? '0.30'),
     poleDarkS: Number(env.FLAG_POLE_DARK_S ?? '0.35'),
     poleMinColumnFraction: Number(env.FLAG_POLE_MIN_COLUMN_FRACTION ?? '0.45'),
