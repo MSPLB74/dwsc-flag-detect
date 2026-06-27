@@ -139,7 +139,16 @@ async function main() {
     }
 
     for (const f of frames) {
-      const name = f.key.split('/').pop();
+      // Derive the local filename from the LAST path segment of the R2 key only.
+      // The key is server-issued (the Worker controls R2 keys), but treat it as
+      // untrusted defence-in-depth: take only the basename and require it to be a
+      // plain filename (no separators, no "..") before joining it to the output
+      // dir, so a malformed/hostile key can never traverse out of `dir`.
+      const name = f.key.split('/').pop() ?? '';
+      if (!/^[\w.-]+$/.test(name) || name === '.' || name === '..') {
+        console.error(`skipping frame with unsafe key: ${f.key}`);
+        continue;
+      }
       const dest = join(dir, name);
       if (await exists(dest)) {
         skipped++;
