@@ -91,6 +91,11 @@ jobs:
           # Real flag flies in bands 1 and 2 (middle half of the crop) so
           # this doesn't lose detections.
           FLAG_SKIP_SEGMENTS: "0,3"
+          # Colour sat/val floors: a pixel below either is "none" before hue
+          # bucketing. At the original defaults (no behaviour change); exposed
+          # so the /admin/flag-tuning optimizer can suggest + apply a satFloor.
+          FLAG_SAT_FLOOR: "0.4"
+          FLAG_VAL_FLOOR: "0.2"
           # Annotated PNG of what the detector is seeing — uploaded as
           # the 'annotated-frame' workflow artifact below.
           FLAG_ANNOTATE_OUT: ${{ runner.temp }}/annotated.png
