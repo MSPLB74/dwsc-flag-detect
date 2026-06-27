@@ -1,0 +1,14 @@
+# Keeps the SHA-pinned GitHub Actions from silently drifting onto an unpatched
+# version. github-actions only (this repo has zero npm runtime deps). Monthly +
+# grouped so it's at most ONE bundled PR a month, often none. Actions are
+# unlimited on this public repo, so the cost is just a quick glance + merge.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
