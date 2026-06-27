@@ -1,0 +1,65 @@
+name: Crop check
+
+# Daily drift check for the flag-detect pipeline. Pulls a frame, scans
+# full frame width for the flagpole, and reports whether it still sits
+# inside the production FLAG_CROP's safe zone. If it doesn't (camera
+# nudged, view obscured), the script exits non-zero, the workflow fails,
+# and GitHub sends the repo admin an email.
+#
+# Triggered by Cloudflare Worker cron at ~11:00 UK time on Wed-Sun (Mon
+# and Tue are member-closure days, when flags may still be flying for
+# lessons — the check would flag false positives). workflow_dispatch
+# stays available for manual runs.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crop-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Run crop-check
+        env:
+          # Must match the FLAG_CROP set in flag-detect.yml so the check
+          # evaluates the same crop the live detector uses. Last synced
+          # 2026-05-28 — production was narrowed to width=0.150 on
+          # 2026-05-24 (to exclude the orange safety boat) but crop-check
+          # was left on an older wider value, which set off a false drift
+          # alarm. If you change FLAG_CROP in flag-detect.yml, copy the
+          # value here too.
+          FLAG_CROP: "0.319,0.050,0.150,0.700"
+          # Pole-detection thresholds — MUST match flag-detect.yml so the
+          # crop-check finds the pole exactly the way the live detector does.
+          # crop-check now shares classify.mjs's thin-spike detectPole (it
+          # used to run a naive "most dark pixels wins" scan that latched
+          # onto wide/edge dark structures and fired false DRIFT alarms).
+          # Keep these in sync with flag-detect.yml's FLAG_POLE_* values.
+          FLAG_POLE_DARK_V: "0.45"
+          FLAG_POLE_MIN_COLUMN_FRACTION: "0.30"
+          FLAG_POLE_NEIGHBOR_RADIUS: "10"
+          FLAG_POLE_EDGE_MARGIN: "20"
+          # Pole-position safe-zone, as a fraction of the crop width.
+          # With production crop width=0.150 and the pole at frame
+          # x=0.394, the pole lands at 50% of the crop — well inside the
+          # 5%-95% safe range. Tighter than the script default of
+          # 0.25-0.75 because our narrower crop leaves less room to
+          # drift before the pole leaves the frame.
+          POLE_SAFE_MIN: "0.05"
+          POLE_SAFE_MAX: "0.95"
+        run: node scripts/crop-check.mjs

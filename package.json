@@ -1,0 +1,14 @@
+{
+  "name": "dwsc-flag-detect",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "description": "DWSC water-status flag detector — ffmpeg + HSV classifier pipeline for the DatchetCam feed, run on GitHub Actions and triggered by the member-app's Cloudflare Worker cron.",
+  "scripts": {
+    "test": "node --test scripts/classify.test.mjs scripts/png.test.mjs scripts/eval-flag.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {}
+}

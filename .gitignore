@@ -1,0 +1,13 @@
+# Pulled detector frames + their labels — images of the public webcam plus any
+# hand-review notes. They live in R2, are fetched at runtime, and must NEVER be
+# committed (this is a PUBLIC repo). pull-flag-frames.mjs writes here.
+flag-frames/
+
+# Local scratch
+*.mp4
+annotated*.png
+*.log
+
+# Node / OS
+node_modules/
+.DS_Store

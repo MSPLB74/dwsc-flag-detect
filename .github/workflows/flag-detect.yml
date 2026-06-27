@@ -1,0 +1,109 @@
+name: Flag detect
+
+# Classifies the safety flag flying outside the DWSC office from the
+# DatchetCam feed and posts the result to the Worker.
+#
+# Scheduling is now done from a Cloudflare Worker cron (Cloudflare's
+# scheduler is reliable; GitHub's schedule: trigger on the free tier
+# was deprioritising and silently dropping firings, going hours
+# between runs). The Worker fires workflow_dispatch every 30 min
+# during UK opening hours (10:00–20:30) — the time-window gate lives
+# on the Worker side now, so this workflow doesn't need to know about
+# clocks. Manual workflow_dispatch from the GitHub UI / gh CLI also
+# works at any time for ad-hoc debugging.
+#
+# Artifact policy (2026-06-20): the annotated frame used to be uploaded
+# on EVERY run with 7-day retention. At ~2 MB/frame that filled the
+# free-tier 500 MB Actions-storage cap (0.45 GB used). Now the frame is
+# only kept when the run FAILS (worth triaging) or when a human dispatches
+# with upload_frame=true, and retention is 1 day. Healthy scheduled runs
+# upload nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_frame:
+        description: 'Keep the annotated detector frame as an artifact (debugging)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flag-detect
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Detect flag
+        env:
+          API_URL: https://dwsc-api.marksbraganza.workers.dev
+          FLAG_DETECTOR_SECRET: ${{ secrets.FLAG_DETECTOR_SECRET }}
+          # Archive a sampled (≈hourly) annotated frame to R2 via the Worker,
+          # so we keep a cheap training/tuning set without GitHub artifact
+          # storage. The script self-samples to the top-of-hour fire.
+          FLAG_FRAME_ARCHIVE: "1"
+          # Static crop hardwired from a 2026-05-22 morning calibration after
+          # the camera was re-aimed (pole at ~39% of frame width). On
+          # 2026-05-24 narrowed from width=0.220 to 0.150 because the right
+          # edge of the wider crop was catching the orange safety boat at
+          # the pier, triggering false "orange flag" readings when nothing
+          # was actually flying. New right-edge at 0.469 leaves the boat
+          # (≈0.54+) well outside; pole at 0.394 stays well inside.
+          # Operational model: admin retunes if cam is permanently re-aimed;
+          # members can "Report wrong reading" from the Water status card.
+          FLAG_CROP: "0.319,0.050,0.150,0.700"
+          # Pole-detection thresholds. Runs INSIDE the static crop as a
+          # camera-alignment sanity check — if no pole-like column found,
+          # the detector reports no_pole.
+          FLAG_POLE_DARK_V: "0.45"
+          FLAG_POLE_MIN_COLUMN_FRACTION: "0.30"
+          FLAG_POLE_NEIGHBOR_RADIUS: "10"
+          FLAG_POLE_EDGE_MARGIN: "20"
+          # Horizontal-band classifier across the static crop. 4 bands;
+          # if any one hits 2% of its pixel-area in a single colour, that's
+          # the flag; otherwise → no_flag.
+          FLAG_STRIP_SEGMENTS: "4"
+          # Lowered from 0.02 to 0.01 on 2026-05-27 — even after the
+          # low-sat green fallback, ~2/12 cron fires were missing the green
+          # flag when it pointed away from camera or flapped narrow,
+          # landing just below 2%. Noise floor with no flag is typically
+          # 0.0-0.1% so 1% still discriminates clearly.
+          FLAG_MIN_SEGMENT_FRACTION: "0.01"
+          # Skip segments that consistently throw false positives:
+          #   0 = top band (sky; saturated blue at dawn/dusk reads as
+          #       blue flag)
+          #   3 = bottom band (pier concrete + water surface; under bright
+          #       sun the concrete's hue/saturation classifies as orange,
+          #       observed 2026-05-24)
+          # Real flag flies in bands 1 and 2 (middle half of the crop) so
+          # this doesn't lose detections.
+          FLAG_SKIP_SEGMENTS: "0,3"
+          # Annotated PNG of what the detector is seeing — uploaded as
+          # the 'annotated-frame' workflow artifact below.
+          FLAG_ANNOTATE_OUT: ${{ runner.temp }}/annotated.png
+        run: node scripts/detect-flag.mjs
+
+      - name: Upload annotated frame
+        # Only keep the frame when it's actually useful: a failed run
+        # (something to triage) or an explicit manual debug dispatch.
+        # Healthy scheduled runs skip this, keeping Actions storage ~0.
+        if: failure() || inputs.upload_frame == true
+        uses: actions/upload-artifact@v7
+        with:
+          name: annotated-frame
+          path: ${{ runner.temp }}/annotated.png
+          retention-days: 1
+          if-no-files-found: warn
