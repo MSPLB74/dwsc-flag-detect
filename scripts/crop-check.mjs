@@ -80,14 +80,38 @@ function run(cmd, args, { captureStdout = false } = {}) {
   });
 }
 
+// Same transient-drop retry as detect-flag.mjs: the DatchetCam box occasionally
+// drops the download mid-stream (fetch throws "terminated"). Retry a couple of
+// times with a gentle backoff so a blip doesn't fail the run + email an alert,
+// but still throw after the last attempt so a genuine outage does alert.
+const MP4_FETCH_ATTEMPTS = 3;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function fetchMp4(dest) {
-  const r = await fetch(MP4_URL, {
-    headers: { 'User-Agent': 'dwsc-crop-check/1.0' },
-  });
-  if (!r.ok) throw new Error(`fetch mp4 ${r.status}`);
-  const buf = Buffer.from(await r.arrayBuffer());
-  await writeFile(dest, buf);
-  console.log(`mp4 ${buf.length} bytes → ${dest}`);
+  let lastErr;
+  for (let attempt = 1; attempt <= MP4_FETCH_ATTEMPTS; attempt++) {
+    try {
+      const r = await fetch(MP4_URL, { headers: { 'User-Agent': 'dwsc-crop-check/1.0' } });
+      if (!r.ok) throw new Error(`fetch mp4 ${r.status}`);
+      const buf = Buffer.from(await r.arrayBuffer());
+      await writeFile(dest, buf);
+      console.log(`mp4 ${buf.length} bytes → ${dest}${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+      return;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < MP4_FETCH_ATTEMPTS) {
+        const backoffMs = 2000 * attempt; // 2s, then 4s
+        console.log(
+          `mp4 fetch attempt ${attempt}/${MP4_FETCH_ATTEMPTS} failed ` +
+            `(${e instanceof Error ? e.message : e}); retrying in ${backoffMs / 1000}s`,
+        );
+        await sleep(backoffMs);
+      }
+    }
+  }
+  throw new Error(
+    `mp4 fetch failed after ${MP4_FETCH_ATTEMPTS} attempts: ${lastErr instanceof Error ? lastErr.message : lastErr}`,
+  );
 }
 
 async function probeDimensions(mp4) {
