@@ -234,8 +234,11 @@ async function writeAnnotatedFrame({
     );
   }
 
-  // Lime line: the column the pole-detector locked onto.
-  filters.push(`drawbox=x=${poleX - 1}:y=${cropY}:w=3:h=${cropH}:color=lime@0.95:t=fill`);
+  // Lime line: the column the pole-detector locked onto (only when it found
+  // one — poleColumn is -1 when no pole was detected, which is now non-fatal).
+  if (poleColumn >= 0) {
+    filters.push(`drawbox=x=${poleX - 1}:y=${cropY}:w=3:h=${cropH}:color=lime@0.95:t=fill`);
+  }
 
   const args = ['-loglevel', 'error', '-y'];
   if (ss != null) args.push('-ss', String(ss));
@@ -337,25 +340,22 @@ async function main() {
     const first = await extractCroppedRgb(mp4, dims, CROP);
     const { rgb, width, height } = first;
 
-    // 2. Sanity-check pole detection inside the crop. If no strong thin
-    //    vertical streak is found, the camera has probably been moved /
-    //    obscured — emit no_pole rather than a guess.
+    // 2. Pole detection runs as a DIAGNOSTIC only — it no longer gates the
+    //    reading. It used to short-circuit to no_pole when it couldn't find a
+    //    thin dark column, on the theory that meant the camera had moved. But
+    //    that was too brittle: on a bright, clear day the thin pole doesn't read
+    //    dark enough (v > poleDarkV) to form a detectable column, so it falsely
+    //    suppressed obviously-flying flags (2026-07-02: blue flag clearly up,
+    //    detector emitted no_pole). Real camera drift is caught by the daily
+    //    crop-check; a genuinely empty pole reads no_flag from the colour
+    //    classifier below. The pole reading is still logged and drawn on the
+    //    annotated frame for debugging.
     const pole = detectPole(rgb, width, height, params);
     console.log(
-      `pole: best column=${pole.bestColumn} of ${width}, ` +
+      `pole (diagnostic): best column=${pole.bestColumn} of ${width}, ` +
         `density=${(pole.bestFraction * 100).toFixed(1)}%, ` +
         `thinness=${(pole.bestScore * 100).toFixed(1)}%, detected=${pole.detected}`,
     );
-
-    if (!pole.detected) {
-      console.log('→ status=no_pole (no thin vertical streak found inside the static crop)');
-      await postResult({
-        status: 'no_pole',
-        confidence: pole.bestFraction,
-        raw: JSON.stringify({ pole, crop: CROP }),
-      });
-      return;
-    }
 
     // 3. Classify several frames spread across the MP4 and pick the strongest.
     //    Wind furls the flag in and out of the crop — a single frame can catch
