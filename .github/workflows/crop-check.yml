@@ -54,6 +54,11 @@ jobs:
           FLAG_POLE_MIN_COLUMN_FRACTION: "0.30"
           FLAG_POLE_NEIGHBOR_RADIUS: "10"
           FLAG_POLE_EDGE_MARGIN: "20"
+          # Colour sat/val floors — keep in sync with flag-detect.yml so the
+          # crop-check colour scan classifies exactly like the live detector.
+          # Raised 0.40 → 0.45 on 2026-07-02 (see flag-detect.yml for why).
+          FLAG_SAT_FLOOR: "0.45"
+          FLAG_VAL_FLOOR: "0.2"
           # Pole-position safe-zone, as a fraction of the crop width.
           # With production crop width=0.150 and the pole at frame
           # x=0.394, the pole lands at 50% of the crop — well inside the
