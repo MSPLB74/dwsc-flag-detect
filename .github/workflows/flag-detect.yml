@@ -92,9 +92,15 @@ jobs:
           # this doesn't lose detections.
           FLAG_SKIP_SEGMENTS: "0,3"
           # Colour sat/val floors: a pixel below either is "none" before hue
-          # bucketing. At the original defaults (no behaviour change); exposed
-          # so the /admin/flag-tuning optimizer can suggest + apply a satFloor.
-          FLAG_SAT_FLOOR: "0.4"
+          # bucketing. Raised 0.40 → 0.45 on 2026-07-02: with the pole gate now
+          # gone, an empty pole was reading false-blue off the pale (~0.45-sat)
+          # sky in the flag band. Measured on a clean flag-flying frame vs a
+          # clean no-flag frame that day: at 0.45 the blue flag reads ~14% of
+          # its band (13x the 1% min-segment floor) while the empty pole drops
+          # to ~0.5% → no_flag. Higher (≥0.52) starts starving the real flag
+          # (fabric is only ~0.5-sat), lower (≤0.42) lets the sky back in. The
+          # /admin/flag-tuning optimizer refines this across all colours/light.
+          FLAG_SAT_FLOOR: "0.45"
           FLAG_VAL_FLOOR: "0.2"
           # Annotated PNG of what the detector is seeing — uploaded as
           # the 'annotated-frame' workflow artifact below.
