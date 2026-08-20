@@ -44,6 +44,12 @@ jobs:
           # alarm. If you change FLAG_CROP in flag-detect.yml, copy the
           # value here too.
           FLAG_CROP: "0.070,0.050,0.150,0.700"
+          # Where to search the frame for the pole. Left 60% only: the
+          # dinghy-park masts at ~78-98% of frame width are thin dark
+          # verticals too and out-scored the real pole on 2026-08-20
+          # (false DRIFT suggesting FLAG_CROP 0.74). Covers the pole's
+          # pre-Aug-2026 position (39%) and current one (15%).
+          POLE_SCAN_CROP: "0.00,0.10,0.60,0.60"
           # Pole-detection thresholds — MUST match flag-detect.yml so the
           # crop-check finds the pole exactly the way the live detector does.
           # crop-check now shares classify.mjs's thin-spike detectPole (it

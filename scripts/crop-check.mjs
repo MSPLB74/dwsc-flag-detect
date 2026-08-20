@@ -28,6 +28,9 @@
 //   FLAG_POLE_EDGE_MARGIN
 //   POLE_SAFE_MIN                 pole position threshold inside crop (0.25)
 //   POLE_SAFE_MAX                 pole position threshold inside crop (0.75)
+//   POLE_SCAN_CROP                region of the frame to search for the pole,
+//                                 same "left,top,w,h" format (default
+//                                 "0.00,0.10,1.00,0.60" = full width)
 //
 // No API_URL/secret — this script reads only, never writes to D1.
 
@@ -43,10 +46,12 @@ const PROD_CROP = parseCrop(process.env.FLAG_CROP ?? '0.15,0.10,0.30,0.60');
 const POLE_SAFE_MIN = Number(process.env.POLE_SAFE_MIN ?? '0.25');
 const POLE_SAFE_MAX = Number(process.env.POLE_SAFE_MAX ?? '0.75');
 
-// Wide diagnostic crop: covers full frame width and the pole's likely
-// vertical extent (sky band through the water line). Wider horizontally
-// than the production crop so we can find the pole wherever it's drifted.
-const SCAN_CROP = { left: 0.0, top: 0.10, w: 1.0, h: 0.60 };
+// Wide diagnostic crop: covers the pole's likely vertical extent (sky band
+// through the water line) and is much wider horizontally than the
+// production crop so we can find the pole wherever it's drifted. Override
+// via POLE_SCAN_CROP to exclude parts of the frame with competing thin
+// dark verticals (e.g. the dinghy-park masts on the right of the frame).
+const SCAN_CROP = parseCrop(process.env.POLE_SCAN_CROP ?? '0.00,0.10,1.00,0.60');
 
 // Pole detection + colour thresholds come from the SAME shared classifier
 // the live detector uses (classify.mjs). Critically this brings the
