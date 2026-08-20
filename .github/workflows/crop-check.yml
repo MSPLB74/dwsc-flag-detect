@@ -43,7 +43,7 @@ jobs:
           # was left on an older wider value, which set off a false drift
           # alarm. If you change FLAG_CROP in flag-detect.yml, copy the
           # value here too.
-          FLAG_CROP: "0.319,0.050,0.150,0.700"
+          FLAG_CROP: "0.070,0.050,0.150,0.700"
           # Pole-detection thresholds — MUST match flag-detect.yml so the
           # crop-check finds the pole exactly the way the live detector does.
           # crop-check now shares classify.mjs's thin-spike detectPole (it
