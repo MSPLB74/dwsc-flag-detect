@@ -32,7 +32,12 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        # Drop third-party apt sources baked into the runner image (Chrome,
+        # Microsoft, ...) so a bad mirror on one of them can't fail the run.
+        # 2026-09-09: three runs died on a "Hash Sum mismatch" from dl.google.com.
+        run: |
+          sudo find /etc/apt/sources.list.d -type f ! -name 'ubuntu*' -delete
+          sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Run crop-check
         env:
